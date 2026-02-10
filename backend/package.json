@@ -33,6 +33,7 @@
     "dotenv": "^17.2.4",
     "fastify": "^5.7.4",
     "openai": "^6.19.0",
+    "puppeteer": "^24.37.2",
     "sqlite3": "^5.1.7"
   },
   "devDependencies": {
