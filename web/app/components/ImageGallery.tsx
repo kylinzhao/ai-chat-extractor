@@ -56,17 +56,24 @@ export function ImageGallery({ images, onRegenerate, regenerating = [] }: ImageG
     return (b.timestamp || '').localeCompare(a.timestamp || '');
   });
 
+  // Keep only the newest image for each template type
+  const uniqueImages = sortedImages.filter((image, index, self) => {
+    // Find the first occurrence of this template type (which is the newest due to sorting)
+    const firstOccurrence = self.findIndex(img => img.template === image.template);
+    return index === firstOccurrence;
+  });
+
   return (
     <>
       <div className="bg-white border border-gray-200 rounded-lg p-6 mb-4">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-            🖼️ 渲染图片 ({images.length})
+            🖼️ 渲染图片 ({uniqueImages.length})
           </h2>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {sortedImages.map((image, index) => {
+          {uniqueImages.map((image, index) => {
             const templateInfo = templateLabels[image.template] || {
               label: image.template,
               color: 'bg-gray-100 text-gray-800'
