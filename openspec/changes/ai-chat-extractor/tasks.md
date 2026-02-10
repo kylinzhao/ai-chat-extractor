@@ -2,17 +2,17 @@
 
 ## 1. 项目设置和基础设施
 
-- [ ] 1.1 创建项目根目录和 monorepo 结构（`/plugins/`, `/backend/`, `/web/`）
-- [ ] 1.2 初始化 Git 仓库，配置 .gitignore 文件
-- [ ] 1.3 后端项目：初始化 Node.js 项目，安装 Fastify、TypeScript、开发依赖
-- [ ] 1.4 后端项目：配置 TypeScript 编译选项和 tsconfig.json
-- [ ] 1.5 后端项目：配置 ESLint、Prettier 代码规范工具
-- [ ] 1.6 后端项目：设置环境变量管理（dotenv），创建 .env.example 文件
-- [ ] 1.7 数据库：设计 SQLite 数据库 Schema（conversations、summary_groups 表）
-- [ ] 1.8 数据库：实现数据库初始化脚本和迁移工具
-- [ ] 1.9 数据库：创建数据访问层（Repository 模式），封装 CRUD 操作
-- [ ] 1.10 Docker：创建后端服务的 Dockerfile
-- [ ] 1.11 Docker：创建 docker-compose.yml，编排后端、数据库服务
+- [x] 1.1 创建项目根目录和 monorepo 结构（`/plugins/`, `/backend/`, `/web/`）
+- [x] 1.2 初始化 Git 仓库，配置 .gitignore 文件
+- [x] 1.3 后端项目：初始化 Node.js 项目，安装 Fastify、TypeScript、开发依赖
+- [x] 1.4 后端项目：配置 TypeScript 编译选项和 tsconfig.json
+- [x] 1.5 后端项目：配置 ESLint、Prettier 代码规范工具
+- [x] 1.6 后端项目：设置环境变量管理（dotenv），创建 .env.example 文件
+- [x] 1.7 数据库：设计 SQLite 数据库 Schema（conversations、summary_groups 表）
+- [x] 1.8 数据库：实现数据库初始化脚本和迁移工具
+- [x] 1.9 数据库：创建数据访问层（Repository 模式），封装 CRUD 操作
+- [x] 1.10 Docker：创建后端服务的 Dockerfile
+- [x] 1.11 Docker：创建 docker-compose.yml，编排后端、数据库服务
 - [ ] 1.12 CI/CD：配置 GitHub Actions 或 GitLab CI（可选）
 
 ## 2. 浏览器插件开发（MVP 阶段）
@@ -33,17 +33,17 @@
 
 ## 3. 后端 API 开发
 
-- [ ] 3.1 API 路由：实现 POST /api/conversations 端点（接收插件数据）
-- [ ] 3.2 API 验证：实现请求体验证（JSON Schema），验证必需字段
-- [ ] 3.3 API 验证：实现 CORS 配置和来源验证
-- [ ] 3.4 业务逻辑：实现对话数据存储逻辑（创建 conversation 记录）
-- [ ] 3.5 业务逻辑：实现 Summary_Group 关联记录创建
-- [ ] 3.6 API 路由：实现 GET /api/conversations（查询所有记录，支持分页、筛选）
-- [ ] 3.7 API 路由：实现 GET /api/conversations/:id（查询单条记录）
-- [ ] 3.8 API 路由：实现 PATCH /api/conversations/:id（更新记录，支持手动编辑）
-- [ ] 3.9 API 路由：实现 DELETE /api/conversations/:id（删除记录）
-- [ ] 3.10 API 路由：实现 POST /api/conversations/batch-update-visibility（批量切换可见性）
-- [ ] 3.11 API 路由：实现 POST /api/conversations/batch-delete（批量删除）
+- [x] 3.1 API 路由：实现 POST /api/conversations 端点（接收插件数据）
+- [x] 3.2 API 验证：实现请求体验证（JSON Schema），验证必需字段
+- [x] 3.3 API 验证：实现 CORS 配置和来源验证
+- [x] 3.4 业务逻辑：实现对话数据存储逻辑（创建 conversation 记录）
+- [x] 3.5 业务逻辑：实现 Summary_Group 关联记录创建
+- [x] 3.6 API 路由：实现 GET /api/conversations（查询所有记录，支持分页、筛选）
+- [x] 3.7 API 路由：实现 GET /api/conversations/:id（查询单条记录）
+- [x] 3.8 API 路由：实现 PATCH /api/conversations/:id（更新记录，支持手动编辑）
+- [x] 3.9 API 路由：实现 DELETE /api/conversations/:id（删除记录）
+- [x] 3.10 API 路由：实现 POST /api/conversations/batch-update-visibility（批量切换可见性）
+- [x] 3.11 API 路由：实现 POST /api/conversations/batch-delete（批量删除）
 - [ ] 3.12 API 安全：实现请求频率限制（Rate Limiting）
 - [ ] 3.13 API 安全：实现输入清理和验证（防止注入攻击）
 - [ ] 3.14 API 日志：实现操作日志记录（数据接收、错误、API 调用）
