@@ -17,17 +17,17 @@
 
 ## 2. 浏览器插件开发（MVP 阶段）
 
-- [ ] 2.1 插件项目：创建 Chrome Extension 项目结构（manifest.json、background.js、content.js、popup）
-- [ ] 2.2 插件配置：编写 manifest.json（Manifest V3），声明必要权限（activeTab、storage、host_permissions）
-- [ ] 2.3 插件配置：配置插件图标和 Popup UI
-- [ ] 2.4 Content Script：实现 Gemini 页面的 DOM 结构分析和选择器
-- [ ] 2.5 Content Script：实现豆包页面的 DOM 结构分析和选择器
-- [ ] 2.6 Content Script：实现对话采集逻辑（提取消息、图片、元数据）
-- [ ] 2.7 Content Script：实现采集按钮注入逻辑（悬浮按钮或 Popup 触发）
-- [ ] 2.8 Background Script：实现 API 通信模块（发送数据到后端）
-- [ ] 2.9 Background Script：实现错误处理和重试逻辑
-- [ ] 2.10 Popup UI：设计并实现 Popup 界面（采集触发、状态显示、配置）
-- [ ] 2.11 插件配置：实现后端 API 地址配置功能（存储到 chrome.storage）
+- [x] 2.1 插件项目：创建 Chrome Extension 项目结构（manifest.json、background.js、content.js、popup）
+- [x] 2.2 插件配置：编写 manifest.json（Manifest V3），声明必要权限（activeTab、storage、host_permissions）
+- [x] 2.3 插件配置：配置插件图标和 Popup UI
+- [x] 2.4 Content Script：实现 Gemini 页面的 DOM 结构分析和选择器
+- [x] 2.5 Content Script：实现豆包页面的 DOM 结构分析和选择器
+- [x] 2.6 Content Script：实现对话采集逻辑（提取消息、图片、元数据）
+- [x] 2.7 Content Script：实现采集按钮注入逻辑（悬浮按钮或 Popup 触发）
+- [x] 2.8 Background Script：实现 API 通信模块（发送数据到后端）
+- [x] 2.9 Background Script：实现错误处理和重试逻辑
+- [x] 2.10 Popup UI：设计并实现 Popup 界面（采集触发、状态显示、配置）
+- [x] 2.11 插件配置：实现后端 API 地址配置功能（存储到 chrome.storage）
 - [ ] 2.12 插件测试：在 Gemini 和豆包网站进行端到端测试
 - [ ] 2.13 插件打包：构建生产版本，准备发布到 Chrome Web Store
 
@@ -44,7 +44,7 @@
 - [x] 3.9 API 路由：实现 DELETE /api/conversations/:id（删除记录）
 - [x] 3.10 API 路由：实现 POST /api/conversations/batch-update-visibility（批量切换可见性）
 - [x] 3.11 API 路由：实现 POST /api/conversations/batch-delete（批量删除）
-- [ ] 3.12 API 安全：实现请求频率限制（Rate Limiting）
+- [x] 3.12 API 安全：实现请求频率限制（Rate Limiting）
 - [ ] 3.13 API 安全：实现输入清理和验证（防止注入攻击）
 - [ ] 3.14 API 日志：实现操作日志记录（数据接收、错误、API 调用）
 - [ ] 3.15 API 文档：集成 Swagger/OpenAPI 文档（可选）

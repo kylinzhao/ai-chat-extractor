@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Chat Extractor</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🤖 AI Chat Extractor</h1>
+    </header>
+
+    <main>
+      <!-- API 配置区域 -->
+      <section class="config-section">
+        <label for="apiUrl">后端 API 地址:</label>
+        <input
+          type="text"
+          id="apiUrl"
+          placeholder="http://localhost:3000"
+          class="input-field"
+        />
+        <button id="saveConfig" class="btn btn-secondary">保存配置</button>
+      </section>
+
+      <!-- 当前页面状态 -->
+      <section class="status-section">
+        <div class="status-indicator">
+          <span class="status-dot" id="statusDot"></span>
+          <span id="statusText">检测中...</span>
+        </div>
+        <p class="platform-info" id="platformInfo"></p>
+      </section>
+
+      <!-- 采集操作区域 -->
+      <section class="action-section">
+        <button id="extractBtn" class="btn btn-primary" disabled>
+          📥 采集当前对话
+        </button>
+        <div id="progressInfo" class="progress-info hidden">
+          <div class="spinner"></div>
+          <span id="progressText">正在采集...</span>
+        </div>
+      </section>
+
+      <!-- 最近采集记录 -->
+      <section class="history-section">
+        <h3>最近采集</h3>
+        <div id="historyList" class="history-list">
+          <p class="empty-text">暂无采集记录</p>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <a href="#" id="openSettings">⚙️ 设置</a>
+      <span class="version">v1.0.0</span>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
