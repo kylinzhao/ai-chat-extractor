@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { getAITaskQueue, AITaskType } from '../ai/ai-queue';
 import { getPromptManager } from '../ai/prompts';
 import { getSiliconFlowClient } from '../ai/siliconflow.client';
+import { ConversationRepository } from '../models/conversation.repository';
 
 /**
  * AI 相关路由
@@ -55,7 +56,7 @@ export async function aiRoutes(fastify: FastifyInstance) {
       const conversationId = parseInt((request.params as { id: string }).id);
       const body = request.body as any;
 
-      // 验证对话 ID（避免未使用变量警告）
+      // 验证对话 ID
       if (isNaN(conversationId)) {
         return reply.status(400).send({ error: 'Invalid conversation ID' });
       }
@@ -69,32 +70,29 @@ export async function aiRoutes(fastify: FastifyInstance) {
         });
       }
 
-      // 这里需要从数据库获取对话数据
-      // TODO: 实现 ConversationRepository.getConversationById
-      // const conversation = await conversationRepo.findById(conversationId);
-      // if (!conversation) {
-      //   return reply.status(404).send({ error: 'Conversation not found' });
-      // }
+      // 从数据库获取对话数据
+      const conversationRepo = new ConversationRepository();
+      const conversation = conversationRepo.findById(conversationId);
 
-      // 临时：返回错误提示需要实现数据库查询
-      return reply.status(501).send({
-        error: 'Not implemented',
-        message: '需要先实现数据库查询逻辑',
+      if (!conversation) {
+        return reply.status(404).send({ error: 'Conversation not found' });
+      }
+
+      // 将任务添加到队列
+      const queue = getAITaskQueue();
+      const task = queue.addTask(taskType, conversationId, conversation);
+
+      return reply.status(202).send({
+        taskId: task.id,
+        status: task.status,
+        message: '任务已加入队列',
+        type: taskType,
       });
-
-      // 以下代码在数据库查询实现后启用：
-      // const queue = getAITaskQueue();
-      // const task = queue.addTask(taskType, conversationId, conversation);
-
-      // return reply.status(202).send({
-      //   taskId: task.id,
-      //   status: task.status,
-      //   message: 'Task queued successfully',
-      // });
     } catch (error) {
       fastify.log.error(error);
       return reply.status(500).send({
         error: 'Internal server error',
+        message: error instanceof Error ? error.message : String(error),
       });
     }
   });
