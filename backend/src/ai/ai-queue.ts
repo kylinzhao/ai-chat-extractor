@@ -59,7 +59,7 @@ export class AITaskQueue {
   private processing: Map<string, AITask> = new Map();
   private config: QueueConfig;
 
-  constructor(config: QueueConfig = { maxConcurrent: 3, retryLimit: 3, timeout: 120000 }) {
+  constructor(config: QueueConfig = { maxConcurrent: 3, retryLimit: 3, timeout: 300000 }) {
     this.config = config;
   }
 
@@ -177,12 +177,20 @@ export class AITaskQueue {
         throw new Error(`Prompt template not found: ${task.type}`);
       }
 
+      // 调试日志：检查 prompt 长度
+      const conversationJson = JSON.stringify(task.conversationData);
+      console.log(`[AI Queue] Task ${task.id} - System prompt: ${prompts.systemPrompt.length} chars`);
+      console.log(`[AI Queue] Task ${task.id} - User prompt: ${conversationJson.length} chars`);
+      console.log(`[AI Queue] Task ${task.id} - Message count: ${variables.messageCount}`);
+
       // 调用 AI API
       const client = getSiliconFlowClient();
+      console.log(`[AI Queue] Task ${task.id} - Calling AI API...`);
       const response: AIResponse = await this.withTimeout(
-        client.generate(prompts.systemPrompt, JSON.stringify(task.conversationData), 0.7, 4000),
+        client.generate(prompts.systemPrompt, conversationJson, 0.7, 4000),
         this.config.timeout
       );
+      console.log(`[AI Queue] Task ${task.id} - AI API responded successfully`);
 
       // 检查禁用词
       const violationCheck = promptManager.checkForbiddenWords(response.content, task.type);
@@ -194,7 +202,7 @@ export class AITaskQueue {
         // response.content = promptManager.cleanForbiddenWords(response.content, task.type);
       }
 
-      // 保存结果
+      // 保存结果到任务对象
       task.result = response.content;
       task.usage = {
         promptTokens: response.usage.promptTokens,
@@ -208,8 +216,53 @@ export class AITaskQueue {
       console.log(
         `[AI Queue] Task ${task.id} completed. Tokens: ${response.usage.totalTokens}, Cost: ¥${response.cost?.toFixed(4)}`
       );
+
+      // 保存结果到数据库
+      try {
+        const { ConversationRepository } = require('../models/conversation.repository');
+        const conversationRepo = new ConversationRepository();
+
+        if (task.type === AITaskType.SOCIAL_MEDIA_SUMMARY) {
+          conversationRepo.update(task.conversationId, { social_media_summary: response.content });
+          console.log(`[AI Queue] Saved social_media_summary to database for conversation ${task.conversationId}`);
+        } else if (task.type === AITaskType.DETAILED_SUMMARY) {
+          conversationRepo.update(task.conversationId, { detailed_summary: response.content });
+          console.log(`[AI Queue] Saved detailed_summary to database for conversation ${task.conversationId}`);
+        }
+
+        // 检查是否所有 AI 任务都已完成
+        const allTasks = this.getConversationTasks(task.conversationId);
+        const allAITasks = allTasks.filter(t => t.category === 'ai');
+        const allCompleted = allAITasks.every(t => t.status === AITaskStatus.COMPLETED || t.status === AITaskStatus.FAILED);
+
+        if (allCompleted && allAITasks.length > 0) {
+          // 获取渲染任务
+          const { getRenderQueue } = require('../rendering/render-queue');
+          const renderQueue = getRenderQueue();
+          const allRenderTasks = renderQueue.getConversationTasks(task.conversationId);
+          const allRenderCompleted = allRenderTasks.every(t => t.status === 'completed' || t.status === 'failed');
+
+          // 如果 AI 和渲染任务都完成了，更新 conversation status
+          if (allRenderCompleted || allRenderTasks.length === 0) {
+            conversationRepo.update(task.conversationId, { status: 'completed' });
+            console.log(`[AI Queue] Updated conversation ${task.conversationId} status to 'completed'`);
+          }
+        }
+      } catch (dbError) {
+        console.error(`[AI Queue] Failed to save result to database:`, dbError);
+        // 不影响任务状态，因为结果已经在内存中了
+      }
     } catch (error) {
       console.error(`[AI Queue] Task ${task.id} failed:`, error);
+
+      // 详细错误信息
+      if (error instanceof Error) {
+        console.error(`[AI Queue] Error name: ${error.name}`);
+        console.error(`[AI Queue] Error message: ${error.message}`);
+        if (error.stack) {
+          console.error(`[AI Queue] Error stack: ${error.stack.substring(0, 200)}`);
+        }
+      }
 
       // 重试逻辑
       if (task.retryCount < this.config.retryLimit) {
@@ -296,7 +349,7 @@ export function getAITaskQueue(): AITaskQueue {
     queueInstance = new AITaskQueue({
       maxConcurrent: 3, // 最多 3 个并发任务
       retryLimit: 3, // 失败重试 3 次
-      timeout: 120000, // 2 分钟超时
+      timeout: 300000, // 5 分钟超时
     });
 
     // 启动队列

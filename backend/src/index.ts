@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
+import staticFiles from '@fastify/static';
 import dotenv from 'dotenv';
 import { join } from 'path';
 import { initDatabase } from './models/database';
@@ -39,6 +40,12 @@ async function buildServer() {
       retryAfter: Math.round(Number(context.after) / 1000),
     }),
     skipOnError: false,
+  });
+
+  // Register static file serving
+  await server.register(staticFiles, {
+    root: join(__dirname, '../public'),
+    prefix: '/public/',
   });
 
   // Initialize database

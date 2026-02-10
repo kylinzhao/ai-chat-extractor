@@ -1,9 +1,14 @@
 import { FastifyInstance } from 'fastify';
 import { ConversationRepository } from '../models/conversation.repository';
 import { SummaryGroupRepository } from '../models/summary-group.repository';
+import { getAITaskQueue, AITaskType } from '../ai/ai-queue';
+import { getRenderQueue, RenderTaskType } from '../rendering/render-queue';
 
 const conversationRepo = new ConversationRepository();
 const summaryGroupRepo = new SummaryGroupRepository();
+
+// 自动生成开关（从环境变量读取，默认启用）
+const AUTO_GENERATION_ENABLED = process.env.AUTO_GENERATION_ENABLED !== 'false';
 
 export async function conversationRoutes(fastify: FastifyInstance) {
   // POST /api/conversations - Create a new conversation
@@ -52,6 +57,15 @@ export async function conversationRoutes(fastify: FastifyInstance) {
       });
 
       fastify.log.info(`Created conversation ${conversationId} from ${body.platform}`);
+
+      // 异步触发生成任务（不阻塞响应）
+      if (AUTO_GENERATION_ENABLED) {
+        setImmediate(() => {
+          triggerAutoGeneration(fastify, conversationId).catch(error => {
+            fastify.log.error(`[Auto-Generation] Failed to trigger tasks for conversation ${conversationId}:`, error);
+          });
+        });
+      }
 
       return reply.status(201).send({
         id: conversationId,
@@ -130,6 +144,61 @@ export async function conversationRoutes(fastify: FastifyInstance) {
       return reply.status(500).send({
         error: 'Internal server error',
         message: 'Failed to fetch conversation',
+      });
+    }
+  });
+
+  // GET /api/conversations/:id/status - Get generation task status
+  fastify.get<{ Params: { id: string } }>('/conversations/:id/status', async (request, reply) => {
+    try {
+      const id = parseInt(request.params.id);
+
+      // Check if conversation exists
+      const conversation = conversationRepo.findById(id);
+      if (!conversation) {
+        return reply.status(404).send({
+          error: 'Not found',
+          message: `Conversation ${id} not found`,
+        });
+      }
+
+      // Get AI tasks
+      const aiQueue = getAITaskQueue();
+      const aiTasks = aiQueue.getConversationTasks(id);
+
+      // Get render tasks
+      const renderQueue = getRenderQueue();
+      const renderTasks = renderQueue.getConversationTasks(id);
+
+      // Combine into unified format
+      const tasks = [
+        ...aiTasks.map(t => ({
+          type: t.type,
+          category: 'ai' as const,
+          status: t.status,
+          createdAt: t.createdAt.toISOString(),
+          completedAt: t.completedAt?.toISOString(),
+          error: t.error,
+        })),
+        ...renderTasks.map(t => ({
+          type: t.type,
+          category: 'render' as const,
+          status: t.status,
+          createdAt: t.createdAt.toISOString(),
+          completedAt: t.completedAt?.toISOString(),
+          error: t.error,
+        })),
+      ];
+
+      return {
+        conversationId: id,
+        tasks,
+      };
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.status(500).send({
+        error: 'Internal server error',
+        message: 'Failed to fetch task status',
       });
     }
   });
@@ -279,4 +348,48 @@ export async function conversationRoutes(fastify: FastifyInstance) {
       });
     }
   });
+}
+
+/**
+ * 触发自动生成任务
+ * 在对话创建成功后自动调用，不阻塞采集接口的响应
+ */
+async function triggerAutoGeneration(fastify: FastifyInstance, conversationId: number) {
+  try {
+    const conversation = conversationRepo.findById(conversationId);
+    if (!conversation) {
+      throw new Error(`Conversation ${conversationId} not found`);
+    }
+
+    fastify.log.info(`[Auto-Generation] Triggering tasks for conversation ${conversationId}`);
+
+    // 获取任务队列
+    const aiQueue = getAITaskQueue();
+    const renderQueue = getRenderQueue();
+
+    // 触发 AI 社交媒体摘要生成
+    aiQueue.addTask(AITaskType.SOCIAL_MEDIA_SUMMARY, conversationId, conversation);
+    fastify.log.info(`[Auto-Generation] Triggered social_media_summary task for conversation ${conversationId}`);
+
+    // 触发 AI 详细汇总生成
+    aiQueue.addTask(AITaskType.DETAILED_SUMMARY, conversationId, conversation);
+    fastify.log.info(`[Auto-Generation] Triggered detailed_summary task for conversation ${conversationId}`);
+
+    // 触发图片渲染（Bento UI 作为默认模板）
+    const renderData = {
+      conversationId,
+      platform: conversation.platform,
+      socialMediaSummary: conversation.social_media_summary || '',
+      detailedSummary: conversation.detailed_summary || '',
+      messageCount: conversation.messages.length,
+      capturedAt: conversation.captured_at,
+      imageUrl: conversation.image_urls?.[0] || '',
+    };
+    renderQueue.addTask(RenderTaskType.BENTO, renderData);
+    fastify.log.info(`[Auto-Generation] Triggered bento render task for conversation ${conversationId}`);
+  } catch (error) {
+    fastify.log.error(`[Auto-Generation] Error triggering tasks for conversation ${conversationId}:`);
+    fastify.log.error(error);
+    throw error;
+  }
 }

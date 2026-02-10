@@ -1,5 +1,8 @@
 import { getPuppeteerManager } from './puppeteer-manager';
 import { getTemplate, TemplateType } from './templates';
+import { writeFile, mkdir } from 'fs/promises';
+import { join } from 'path';
+import { ConversationRepository } from '../models/conversation.repository';
 
 /**
  * 渲染任务类型
@@ -178,35 +181,44 @@ export class RenderQueue {
 
         // 渲染页面
         await instance.page.setContent(html, {
-          waitUntil: 'networkidle0',
+          waitUntil: 'domcontentloaded', // 使用更快的等待策略
           timeout: this.config.timeout,
         });
 
         // 等待字体加载
         await instance.page.evaluateHandle('document.fonts.ready');
 
-        // 生成截图（临时未使用，等待保存逻辑实现）
-        await instance.page.screenshot({
+        // 确保渲染目录存在
+        const rendersDir = join(__dirname, '../../public/renders');
+        await mkdir(rendersDir, { recursive: true });
+
+        // 生成文件名：conversationId-templateType-timestamp.png
+        const filename = `${task.data.conversationId}-${task.type}-${Date.now()}.png`;
+        const imagePath = join(rendersDir, filename);
+        const imageUrl = `/public/renders/${filename}`;
+
+        // 生成截图并保存到文件
+        const buffer = await instance.page.screenshot({
           type: 'png',
-          encoding: 'base64',
         });
+        await writeFile(imagePath, buffer);
 
-        // TODO: 保存图片到文件系统和数据库
-        // const imagePath = await saveImage(screenshot, task.id);
-        // const imageUrl = generateImageUrl(imagePath);
-
-        // 临时：保存结果
+        // 保存结果
         task.result = {
-          imagePath: `/tmp/renders/${task.id}.png`,
-          imageUrl: `/renders/${task.id}.png`,
+          imagePath,
+          imageUrl,
         };
+
+        // 追加图片 URL 到对话
+        const conversationRepo = new ConversationRepository();
+        conversationRepo.appendImageUrl(task.data.conversationId, imageUrl);
 
         task.renderTime = Date.now() - startTime;
         task.status = RenderTaskStatus.COMPLETED;
         task.completedAt = new Date();
 
         console.log(
-          `[Render Queue] 任务 ${task.id} 完成，耗时 ${task.renderTime}ms`
+          `[Render Queue] 任务 ${task.id} 完成，耗时 ${task.renderTime}ms，已保存到 ${imageUrl}`
         );
       } finally {
         // 释放实例

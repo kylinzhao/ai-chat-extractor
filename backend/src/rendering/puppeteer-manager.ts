@@ -34,6 +34,7 @@ export class PuppeteerManager {
   private pool: Map<string, PuppeteerInstance> = new Map();
   private config: PuppeteerManagerConfig;
   private initialized = false;
+  private chromeExecutablePath: string | undefined;
 
   constructor(config?: Partial<PuppeteerManagerConfig>) {
     this.config = {
@@ -54,12 +55,12 @@ export class PuppeteerManager {
 
     console.log(`[Puppeteer Manager] 初始化实例池（大小: ${this.config.poolSize}）...`);
 
-    // 获取 Chrome 可执行文件路径
-    const executablePath = await this.getChromePath();
+    // 获取 Chrome 可执行文件路径并存储
+    this.chromeExecutablePath = await this.getChromePath();
 
     // 预启动实例
     const launchPromises = Array.from({ length: this.config.poolSize }, (_, i) =>
-      this.launchInstance(i.toString(), executablePath)
+      this.launchInstance(i.toString(), this.chromeExecutablePath)
     );
 
     await Promise.all(launchPromises);
@@ -120,10 +121,10 @@ export class PuppeteerManager {
 
       const page = await browser.newPage();
 
-      // 设置视口大小（@2x 高清）
+      // 设置视口大小（@2x 高清，竖图适合社交媒体）
       await page.setViewport({
-        width: 1200,
-        height: 800,
+        width: 1080,
+        height: 1920,
         deviceScaleFactor: 2,
       });
 
@@ -211,9 +212,9 @@ export class PuppeteerManager {
 
     this.pool.delete(instance.id);
 
-    // 重新启动
+    // 重新启动（使用存储的 Chrome 路径）
     const id = instance.id.replace('instance-', '');
-    await this.launchInstance(id);
+    await this.launchInstance(id, this.chromeExecutablePath);
   }
 
   /**

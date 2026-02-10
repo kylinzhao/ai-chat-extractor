@@ -42,7 +42,7 @@ export class SiliconFlowClient {
       apiKey: config.apiKey,
       baseURL: config.baseURL || 'https://api.siliconflow.cn/v1',
       maxRetries: this.maxRetries,
-      timeout: config.timeout || 60000, // 默认 60 秒超时
+      timeout: config.timeout || 300000, // 默认 5 分钟超时（与 AI 队列一致）
     });
   }
 
@@ -60,6 +60,11 @@ export class SiliconFlowClient {
     maxTokens: number = 4000
   ): Promise<AIResponse> {
     try {
+      console.log(`[SiliconFlow] Calling ${this.model} API...`);
+      console.log(`[SiliconFlow] System prompt: ${systemPrompt.length} chars`);
+      console.log(`[SiliconFlow] User prompt: ${userPrompt.length} chars`);
+      console.log(`[SiliconFlow] Max tokens: ${maxTokens}, Temperature: ${temperature}`);
+
       const response = await this.client.chat.completions.create({
         model: this.model,
         messages: [
@@ -70,11 +75,13 @@ export class SiliconFlowClient {
         max_tokens: maxTokens,
       });
 
+      console.log(`[SiliconFlow] API response received`);
       const choice = response.choices[0];
       if (!choice || !choice.message.content) {
         throw new Error('Empty response from AI');
       }
 
+      console.log(`[SiliconFlow] Response content length: ${choice.message.content.length} chars`);
       return {
         content: choice.message.content,
         model: response.model,
@@ -86,11 +93,29 @@ export class SiliconFlowClient {
         cost: this.calculateCost(response.usage?.total_tokens || 0),
       };
     } catch (error) {
+      // 详细的错误日志
+      console.error(`[SiliconFlow] API call failed:`);
+      console.error(`[SiliconFlow] Error:`, error);
+
       if (error instanceof OpenAI.APIError) {
+        console.error(`[SiliconFlow] APIError - Status: ${error.status}`);
+        console.error(`[SiliconFlow] APIError - Message: ${error.message}`);
+        console.error(`[SiliconFlow] APIError - Code: ${error.code}`);
+        console.error(`[SiliconFlow] APIError - Type: ${error.type}`);
         throw new Error(
-          `SiliconFlow API error: ${error.message} (status: ${error.status})`
+          `SiliconFlow API error: ${error.message} (status: ${error.status}, code: ${error.code})`
         );
       }
+
+      if (error instanceof Error) {
+        if (error.name === 'AbortError' || error.message.includes('timeout')) {
+          console.error(`[SiliconFlow] Request timeout after ${this.client.timeout}ms`);
+          throw new Error(`AI API request timeout (exceeded ${this.client.timeout}ms)`);
+        }
+        console.error(`[SiliconFlow] Error name: ${error.name}`);
+        console.error(`[SiliconFlow] Error message: ${error.message}`);
+      }
+
       throw error;
     }
   }
@@ -215,7 +240,7 @@ export function getSiliconFlowClient(): SiliconFlowClient {
       baseURL: process.env.SILICONFLOW_API_BASE,
       model: process.env.SILICONFLOW_MODEL,
       maxRetries: 3,
-      timeout: 60000,
+      timeout: 300000, // 5 分钟超时，与 AI 队列一致
     });
   }
 

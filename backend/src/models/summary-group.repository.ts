@@ -96,7 +96,7 @@ export class SummaryGroupRepository {
 
     if (fields.length === 0) return false;
 
-    fields.push('updated_at = datetime("now")');
+    fields.push('updated_at = datetime(\'now\')');
     params.push(id);
 
     const stmt = this.db.prepare(`
@@ -124,7 +124,7 @@ export class SummaryGroupRepository {
 
     if (fields.length === 0) return false;
 
-    fields.push('updated_at = datetime("now")');
+    fields.push('updated_at = datetime(\'now\')');
     params.push(conversationId);
 
     const stmt = this.db.prepare(`

@@ -14,6 +14,8 @@ export interface Conversation {
   captured_at: string;
   messages: Message[];
   image_urls?: string[];
+  social_media_summary?: string;
+  detailed_summary?: string;
   visibility?: number;
   status?: string;
   created_at?: string;
@@ -114,7 +116,7 @@ export class ConversationRepository {
 
     if (fields.length === 0) return false;
 
-    fields.push('updated_at = datetime("now")');
+    fields.push('updated_at = datetime(\'now\')');
     params.push(id);
 
     const stmt = this.db.prepare(`
@@ -127,6 +129,16 @@ export class ConversationRepository {
     return result.changes > 0;
   }
 
+  appendImageUrl(id: number, imageUrl: string): boolean {
+    const conversation = this.findById(id);
+    if (!conversation) return false;
+
+    const currentUrls = conversation.image_urls || [];
+    const updatedUrls = [...currentUrls, imageUrl];
+
+    return this.update(id, { image_urls: updatedUrls });
+  }
+
   delete(id: number): boolean {
     const stmt = this.db.prepare('DELETE FROM conversations WHERE id = ?');
     const result = stmt.run(id);
@@ -136,7 +148,7 @@ export class ConversationRepository {
   batchUpdateVisibility(ids: number[], visibility: number): number {
     const stmt = this.db.prepare(`
       UPDATE conversations
-      SET visibility = ?, updated_at = datetime("now")
+      SET visibility = ?, updated_at = datetime('now')
       WHERE id = ?
     `);
 
@@ -200,6 +212,8 @@ export class ConversationRepository {
       captured_at: row.captured_at,
       messages: JSON.parse(row.messages),
       image_urls: row.image_urls ? JSON.parse(row.image_urls) : undefined,
+      social_media_summary: row.social_media_summary,
+      detailed_summary: row.detailed_summary,
       visibility: row.visibility,
       status: row.status,
       created_at: row.created_at,

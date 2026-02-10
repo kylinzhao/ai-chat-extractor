@@ -55,6 +55,7 @@ export async function aiRoutes(fastify: FastifyInstance) {
     try {
       const conversationId = parseInt((request.params as { id: string }).id);
       const body = request.body as any;
+      const regenerate = body.regenerate === true;
 
       // 验证对话 ID
       if (isNaN(conversationId)) {
@@ -78,6 +79,17 @@ export async function aiRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: 'Conversation not found' });
       }
 
+      // 如果是重新生成，先清除旧数据
+      if (regenerate) {
+        fastify.log.info(`[AI] Regenerating ${taskType} for conversation ${conversationId}, clearing old data`);
+
+        if (taskType === AITaskType.SOCIAL_MEDIA_SUMMARY) {
+          conversationRepo.update(conversationId, { social_media_summary: undefined });
+        } else if (taskType === AITaskType.DETAILED_SUMMARY) {
+          conversationRepo.update(conversationId, { detailed_summary: undefined });
+        }
+      }
+
       // 将任务添加到队列
       const queue = getAITaskQueue();
       const task = queue.addTask(taskType, conversationId, conversation);
@@ -85,8 +97,9 @@ export async function aiRoutes(fastify: FastifyInstance) {
       return reply.status(202).send({
         taskId: task.id,
         status: task.status,
-        message: '任务已加入队列',
+        message: regenerate ? '重新生成任务已加入队列' : '任务已加入队列',
         type: taskType,
+        regenerate,
       });
     } catch (error) {
       fastify.log.error(error);

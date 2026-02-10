@@ -34,6 +34,7 @@ export async function renderRoutes(fastify: FastifyInstance) {
     try {
       const conversationId = parseInt((request.params as { id: string }).id);
       const body = request.body as any;
+      const regenerate = body.regenerate === true;
 
       // 验证对话 ID
       if (isNaN(conversationId)) {
@@ -57,13 +58,19 @@ export async function renderRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: 'Conversation not found' });
       }
 
+      if (regenerate) {
+        fastify.log.info(`[Render] Regenerating ${templateType} for conversation ${conversationId}`);
+        // Note: Image URLs will be appended after render completes
+        // The render queue handles task completion and will add new URLs to the conversation
+      }
+
       // TODO: 获取 AI 生成的摘要
-      // 临时：使用空字符串
+      // 临时：使用空字符串或从 body 获取
       const taskData = {
         conversationId: conversation.id || conversationId,
         platform: conversation.platform,
-        socialMediaSummary: body.socialMediaSummary || undefined,
-        detailedSummary: body.detailedSummary || undefined,
+        socialMediaSummary: body.socialMediaSummary || conversation.social_media_summary || undefined,
+        detailedSummary: body.detailedSummary || conversation.detailed_summary || undefined,
         messageCount: conversation.messages.length,
         capturedAt: conversation.captured_at,
         imageUrl: conversation.image_urls?.[0],
@@ -76,8 +83,9 @@ export async function renderRoutes(fastify: FastifyInstance) {
       return reply.status(202).send({
         taskId: task.id,
         status: task.status,
-        message: '渲染任务已加入队列',
+        message: regenerate ? '重新渲染任务已加入队列' : '渲染任务已加入队列',
         template: templateType,
+        regenerate,
       });
     } catch (error) {
       fastify.log.error(error);
