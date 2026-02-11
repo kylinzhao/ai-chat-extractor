@@ -87,7 +87,7 @@ export default function PublicDetailPage() {
     }
   };
 
-  const renderImage = async (template: 'bento' | 'newsletter' | 'retro_letter') => {
+  const renderImage = async (template: 'bento' | 'newsletter' | 'retro_letter' | 'xiaohongshu') => {
     if (!conversation) return;
 
     const taskKey = `render-${template}`;
@@ -316,9 +316,16 @@ export default function PublicDetailPage() {
             <button
               onClick={() => renderImage('retro_letter')}
               disabled={regenerating['render-retro_letter']}
-              className="px-4 py-3 bg-amber-600 text-white text-sm font-medium rounded-md hover:bg-amber-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors sm:col-span-2"
+              className="px-4 py-3 bg-amber-600 text-white text-sm font-medium rounded-md hover:bg-amber-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
             >
               {regenerating['render-retro_letter'] ? '渲染中...' : '✉️ 重新生成 Retro Letter'}
+            </button>
+            <button
+              onClick={() => renderImage('xiaohongshu')}
+              disabled={regenerating['render-xiaohongshu']}
+              className="px-4 py-3 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+            >
+              {regenerating['render-xiaohongshu'] ? '渲染中...' : '📱 重新生成 小红书风格'}
             </button>
           </div>
 

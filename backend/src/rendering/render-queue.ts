@@ -11,6 +11,7 @@ export enum RenderTaskType {
   BENTO = 'bento',
   NEWSLETTER = 'newsletter',
   RETRO_LETTER = 'retro_letter',
+  XIAOHONGSHU = 'xiaohongshu',
 }
 
 /**

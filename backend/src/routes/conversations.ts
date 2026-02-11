@@ -375,7 +375,7 @@ async function triggerAutoGeneration(fastify: FastifyInstance, conversationId: n
     aiQueue.addTask(AITaskType.DETAILED_SUMMARY, conversationId, conversation);
     fastify.log.info(`[Auto-Generation] Triggered detailed_summary task for conversation ${conversationId}`);
 
-    // 触发图片渲染（Bento UI 作为默认模板）
+    // 触发图片渲染（所有模板类型）
     const renderData = {
       conversationId,
       platform: conversation.platform,
@@ -385,8 +385,16 @@ async function triggerAutoGeneration(fastify: FastifyInstance, conversationId: n
       capturedAt: conversation.captured_at,
       imageUrl: conversation.image_urls?.[0] || '',
     };
+
+    // 生成所有3种模板
     renderQueue.addTask(RenderTaskType.BENTO, renderData);
     fastify.log.info(`[Auto-Generation] Triggered bento render task for conversation ${conversationId}`);
+
+    renderQueue.addTask(RenderTaskType.NEWSLETTER, renderData);
+    fastify.log.info(`[Auto-Generation] Triggered newsletter render task for conversation ${conversationId}`);
+
+    renderQueue.addTask(RenderTaskType.RETRO_LETTER, renderData);
+    fastify.log.info(`[Auto-Generation] Triggered retro_letter render task for conversation ${conversationId}`);
   } catch (error) {
     fastify.log.error(`[Auto-Generation] Error triggering tasks for conversation ${conversationId}:`);
     fastify.log.error(error);

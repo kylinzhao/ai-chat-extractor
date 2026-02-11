@@ -19,6 +19,7 @@ const templateLabels: Record<string, { label: string; color: string }> = {
   bento: { label: 'Bento UI', color: 'bg-green-100 text-green-800' },
   newsletter: { label: 'Newsletter', color: 'bg-teal-100 text-teal-800' },
   retro_letter: { label: 'Retro Letter', color: 'bg-amber-100 text-amber-800' },
+  xiaohongshu: { label: '小红书风格', color: 'bg-red-100 text-red-800' },
 };
 
 export function ImageGallery({ images, onRegenerate, regenerating = [] }: ImageGalleryProps) {
