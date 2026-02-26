@@ -1,0 +1,260 @@
+# 需求文档创建完成总结
+
+**变更名称:** `template-ux-improvements`
+**完成时间:** 2026-02-11
+**状态:** ✅ 所有产出物已完成（4/4）
+
+---
+
+## 已创建的产出物
+
+### 1. Proposal (提案) ✅
+**文件:** `openspec/changes/template-ux-improvements/proposal.md`
+
+**内容概要:**
+- **Why**: 6个用户体验问题（边距、标题、Markdown、异步、折叠）
+- **What Changes**: 4个新功能 + 2个修改功能
+- **Capabilities**:
+  - 新增: markdown-rendering, ai-title-generation, async-render-queue, content-collapse
+  - 修改: xiaohongshu-template, auto-generation
+- **Impact**: Backend（AI, Queue, Templates, DB）, Frontend（Markdown, UI）
+
+---
+
+### 2. Specs (规范) ✅
+**目录:** `openspec/changes/template-ux-improvements/specs/`
+
+创建了6个规范文件：
+
+#### 2.1 markdown-rendering/spec.md
+- 前端渲染 Markdown 格式
+- 图片模板渲染 Markdown 格式
+- Markdown 渲染性能
+- Markdown 渲染安全性（XSS 防护）
+
+#### 2.2 ai-title-generation/spec.md
+- AI 同时生成标题和摘要
+- 标题长度限制（10-20字）
+- 标题风格要求（简洁、吸引人、相关）
+- 标题存储和显示优先级
+
+#### 2.3 async-render-queue/spec.md
+- 渲染任务依赖 AI 任务
+- 任务依赖关系管理
+- 条件触发渲染任务
+- 任务状态监控
+- 错误处理和重试
+
+#### 2.4 content-collapse/spec.md
+- 汇总信息默认收起
+- 折叠/展开交互
+- 折叠状态记忆
+- 内容截断处理
+- Markdown 格式支持
+- 性能要求
+
+#### 2.5 xiaohongshu-template/spec.md
+- **MODIFIED**: 卡片边距优化（40px → 10px）
+- **MODIFIED**: 使用 AI 生成的标题
+- **MODIFIED**: 支持 Markdown 格式渲染
+- 保持视觉设计一致性
+
+#### 2.6 auto-generation/spec.md
+- **MODIFIED**: 调整任务触发顺序（AI 先于渲染）
+- **MODIFIED**: 实现任务依赖检查
+- **MODIFIED**: 改进错误处理
+- 生成所有4种模板
+- 状态更新机制
+
+---
+
+### 3. Design (设计) ✅
+**文件:** `openspec/changes/template-ux-improvements/design.md`
+
+**技术决策:**
+
+#### 3.1 Markdown 渲染库选择
+- **选择**: `react-markdown` + `remark-gfm` + `rehype-highlight`
+- **理由**: React 原生、安全性好、与 Next.js 15 兼容
+- **替代方案**: marked, markdown-it, 自己实现
+
+#### 3.2 AI Title 生成方案
+- **选择**: 修改 AI prompt，要求返回 JSON（title + summary）
+- **理由**: 单次调用节省成本，title 和 summary 更连贯
+- **格式**: `{"title": "简短标题", "summary": "摘要内容"}`
+
+#### 3.3 异步任务依赖机制
+- **选择**: 在 RenderQueue 添加依赖检查
+- **实现**: `dependencies` 字段 + `canExecute()` 方法
+- **理由**: 不改变现有架构，灵活，向后兼容
+
+#### 3.4 小红书模板边距优化
+- **选择**: 直接修改 CSS padding
+- **调整**: padding 40px → 10px，同时调整字体和间距补偿
+
+#### 3.5 汇总信息折叠功能
+- **选择**: React state + CSS transition
+- **实现**: 智能截断（句子边界）+ 平滑动画
+
+#### 3.6 数据库 Migration
+- **选择**: ALTER TABLE ADD COLUMN title TEXT
+- **理由**: 简单直接，向后兼容
+
+**风险和权衡:**
+- Markdown 渲染性能 → 使用异步渲染和缓存
+- AI Title 生成失败 → 回退到提取第一句话
+- 异步依赖死锁 → 超时机制（5分钟）
+- 边距 vs 可读性 → 增加字体大小补偿
+
+**迁移计划:**
+1. 数据库 Migration
+2. 后端实现（AI, Queue, Templates）
+3. 前端实现（Markdown, 折叠）
+4. 测试
+5. 部署
+
+---
+
+### 4. Tasks (任务) ✅
+**文件:** `openspec/changes/template-ux-improvements/tasks.md`
+
+**12个任务组，共80+个任务:**
+
+#### 4.1 数据库 Migration (5 tasks)
+- 备份、创建脚本、执行、验证、回滚准备
+
+#### 4.2 AI Prompt 和 Title 生成 (6 tasks)
+- 修改 prompt、解析 JSON、失败回退、保存、日志、测试
+
+#### 4.3 异步渲染任务依赖 (7 tasks)
+- 添加依赖字段、实现检查、超时、自动触发
+
+#### 4.4 Markdown 渲染库集成 (6 tasks)
+- 安装依赖、创建组件、样式、安全、性能、测试
+
+#### 4.5 前端 Markdown 集成 (5 tasks)
+- 集成到详情页、测试各种格式、长文本性能
+
+#### 4.6 图片模板 Markdown 渲染 (7 tasks)
+- 修改所有4个模板（Bento, Newsletter, Retro, XHS）
+- 转换、转义、测试
+
+#### 4.7 小红书模板优化 (6 tasks)
+- 边距、间距、使用 title、回退逻辑、测试
+
+#### 4.8 汇总信息折叠功能 (8 tasks)
+- 创建组件、默认收起、智能截断、动画、集成、测试
+
+#### 4.9 API 更新 (5 tasks)
+- 更新响应包含 title、状态 API、文档
+
+#### 4.10 测试 (10 tasks)
+- 单元测试、集成测试、性能测试、回归测试
+
+#### 4.11 部署和监控 (8 tasks)
+- 代码审查、migration、部署、监控、回滚
+
+#### 4.12 文档 (4 tasks)
+- 更新文档、说明文档、README、已知限制
+
+---
+
+## 下一步操作
+
+### 选项 1: 开始实施 ✅
+运行以下命令开始实施：
+```bash
+/opsx:apply template-ux-improvements
+```
+
+这将：
+1. 按照 `tasks.md` 中的任务顺序开始实施
+2. 从 Phase 1（数据库 Migration）开始
+3. 逐步完成后端、前端、测试、部署
+
+### 选项 2: 归档变更 📦
+如果暂时不实施，可以归档：
+```bash
+/opsx:archive template-ux-improvements
+```
+
+这将：
+1. 将变更归档到 `openspec/archive/`
+2. 保留所有文档供将来参考
+
+### 选项 3: 继续编辑 ✏️
+如果需要修改任何产出物：
+```bash
+# 编辑特定文件
+vim openspec/changes/template-ux-improvements/proposal.md
+vim openspec/changes/template-ux-improvements/design.md
+vim openspec/changes/template-ux-improvements/tasks.md
+```
+
+---
+
+## 需求优先级建议
+
+基于影响和紧急程度，建议实施顺序：
+
+### 🔴 高优先级（立即实施）
+1. **Markdown 渲染** - 修复格式显示问题
+2. **AI Title 生成** - 提升内容吸引力
+3. **异步依赖** - 修复图片内容为空问题
+
+### 🟡 中优先级（近期实施）
+4. **小红书模板边距** - 提升空间利用率
+5. **汇总信息折叠** - 改善可读性
+
+### 🟢 低优先级（可选）
+6. 性能优化和监控
+
+---
+
+## 技术栈总结
+
+### 新增依赖
+```json
+{
+  "react-markdown": "^9.0.0",
+  "remark-gfm": "^4.0.0",
+  "rehype-highlight": "^7.0.0"
+}
+```
+
+### 数据库变更
+```sql
+ALTER TABLE conversations ADD COLUMN title TEXT;
+```
+
+### 核心文件修改
+- **Backend**:
+  - `backend/src/ai/prompts.ts` - AI prompt
+  - `backend/src/ai/ai-queue.ts` - Title 生成和解析
+  - `backend/src/rendering/render-queue.ts` - 依赖检查
+  - `backend/src/rendering/templates.ts` - 所有模板 Markdown 支持
+  - `backend/src/models/conversation.repository.ts` - title 字段
+
+- **Frontend**:
+  - `web/app/components/MarkdownRenderer.tsx` - 新组件
+  - `web/app/components/CollapsibleText.tsx` - 新组件
+  - `web/app/public/[id]/page.tsx` - 集成组件
+
+---
+
+## 预期成果
+
+完成后将实现：
+- ✅ 完整的 Markdown 渲染支持（前端 + 图片）
+- ✅ AI 自动生成有意义的标题（10-20字）
+- ✅ 图片渲染等待 AI 完成，内容不再为空
+- ✅ 小红书模板空间利用率提升（边距 40px → 10px）
+- ✅ 汇总信息可折叠，页面更清爽
+- ✅ 所有功能向后兼容，旧数据不受影响
+
+---
+
+**所有需求已成功添加到文档！** 🎉
+
+*Generated by Claude Sonnet 4.5*
+*Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>*

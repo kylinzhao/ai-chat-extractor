@@ -33,7 +33,11 @@ build/
 *.db
 *.sqlite
 *.sqlite3
+*.sqlite-shm
+*.sqlite-wal
+*.backup-*
 
 # Generated files
 renders/
 uploads/
+temp/

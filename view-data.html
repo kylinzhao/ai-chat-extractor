@@ -158,28 +158,6 @@
       background: #2563eb;
     }
 
-    .action-btn {
-      background: white;
-      border: 1px solid #d1d5db;
-      color: #374151;
-      padding: 6px 12px;
-      border-radius: 4px;
-      font-size: 12px;
-      cursor: pointer;
-      margin-left: 8px;
-      transition: all 0.2s;
-    }
-
-    .action-btn:hover {
-      background: #f3f4f6;
-      border-color: #9ca3af;
-    }
-
-    .action-group {
-      display: flex;
-      align-items: center;
-    }
-
     .empty-state {
       text-align: center;
       padding: 60px 20px;
@@ -221,7 +199,6 @@
         const response = await fetch(`${API_URL}/api/conversations`);
         const result = await response.json();
         const conversations = result.data;
-        allConversations = conversations;
 
         // 更新统计
         document.getElementById('totalCount').textContent = conversations.length;
@@ -249,13 +226,9 @@
                   ${conv.image_urls ? `| ${conv.image_urls.length} 张图片` : ''}
                 </div>
               </div>
-              <div class="action-group">
-                <span class="platform-badge platform-${conv.platform}">
-                  ${conv.platform}
-                </span>
-                <button class="action-btn" onclick="downloadJson(${conv.id})">JSON</button>
-                <button class="action-btn" onclick="downloadMarkdown(${conv.id})">Markdown</button>
-              </div>
+              <span class="platform-badge platform-${conv.platform}">
+                ${conv.platform}
+              </span>
             </div>
 
             <div class="messages">
@@ -285,47 +258,6 @@
 
     // 页面加载时自动加载数据
     loadData();
-
-    // 导出功能
-    function downloadJson(id) {
-        const conv = allConversations.find(c => c.id === id);
-        if (!conv) return;
-        
-        const dataStr = JSON.stringify(conv, null, 2);
-        downloadFile(dataStr, `conversation-${id}.json`, 'application/json');
-    }
-
-    function downloadMarkdown(id) {
-        const conv = allConversations.find(c => c.id === id);
-        if (!conv) return;
-
-        let md = `# 对话记录 (ID: ${conv.id})\n\n`;
-        md += `- 平台: ${conv.platform}\n`;
-        md += `- 时间: ${new Date(conv.captured_at).toLocaleString('zh-CN')}\n`;
-        md += `- 模型: ${conv.model_version || '未知'}\n\n`;
-        md += `## 消息内容\n\n`;
-
-        conv.messages.forEach(msg => {
-            const role = msg.role === 'user' ? '👤 用户' : '🤖 AI';
-            md += `### ${role}\n\n${msg.content}\n\n---\n\n`;
-        });
-
-        downloadFile(md, `conversation-${id}.md`, 'text/markdown');
-    }
-
-    function downloadFile(content, filename, contentType) {
-        const blob = new Blob([content], { type: contentType });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-    }
-
-    let allConversations = [];
 
     // 每 10 秒自动刷新
     setInterval(loadData, 10000);

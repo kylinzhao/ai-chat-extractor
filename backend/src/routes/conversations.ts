@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { ConversationRepository } from '../models/conversation.repository';
 import { SummaryGroupRepository } from '../models/summary-group.repository';
 import { getAITaskQueue, AITaskType } from '../ai/ai-queue';
-import { getRenderQueue, RenderTaskType } from '../rendering/render-queue';
+import { getRenderQueue } from '../rendering/render-queue';
 
 const conversationRepo = new ConversationRepository();
 const summaryGroupRepo = new SummaryGroupRepository();
@@ -365,7 +365,6 @@ async function triggerAutoGeneration(fastify: FastifyInstance, conversationId: n
 
     // 获取任务队列
     const aiQueue = getAITaskQueue();
-    const renderQueue = getRenderQueue();
 
     // 触发 AI 社交媒体摘要生成
     aiQueue.addTask(AITaskType.SOCIAL_MEDIA_SUMMARY, conversationId, conversation);
@@ -375,26 +374,7 @@ async function triggerAutoGeneration(fastify: FastifyInstance, conversationId: n
     aiQueue.addTask(AITaskType.DETAILED_SUMMARY, conversationId, conversation);
     fastify.log.info(`[Auto-Generation] Triggered detailed_summary task for conversation ${conversationId}`);
 
-    // 触发图片渲染（所有模板类型）
-    const renderData = {
-      conversationId,
-      platform: conversation.platform,
-      socialMediaSummary: conversation.social_media_summary || '',
-      detailedSummary: conversation.detailed_summary || '',
-      messageCount: conversation.messages.length,
-      capturedAt: conversation.captured_at,
-      imageUrl: conversation.image_urls?.[0] || '',
-    };
-
-    // 生成所有3种模板
-    renderQueue.addTask(RenderTaskType.BENTO, renderData);
-    fastify.log.info(`[Auto-Generation] Triggered bento render task for conversation ${conversationId}`);
-
-    renderQueue.addTask(RenderTaskType.NEWSLETTER, renderData);
-    fastify.log.info(`[Auto-Generation] Triggered newsletter render task for conversation ${conversationId}`);
-
-    renderQueue.addTask(RenderTaskType.RETRO_LETTER, renderData);
-    fastify.log.info(`[Auto-Generation] Triggered retro_letter render task for conversation ${conversationId}`);
+    // 注意：渲染任务将在 AI 任务完成后自动触发（见 ai-queue.ts 的完成处理逻辑）
   } catch (error) {
     fastify.log.error(`[Auto-Generation] Error triggering tasks for conversation ${conversationId}:`);
     fastify.log.error(error);

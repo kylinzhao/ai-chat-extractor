@@ -16,6 +16,7 @@ export interface Conversation {
   image_urls?: string[];
   social_media_summary?: string;
   detailed_summary?: string;
+  title?: string;
   visibility?: number;
   status?: string;
   created_at?: string;
@@ -214,6 +215,7 @@ export class ConversationRepository {
       image_urls: row.image_urls ? JSON.parse(row.image_urls) : undefined,
       social_media_summary: row.social_media_summary,
       detailed_summary: row.detailed_summary,
+      title: row.title,
       visibility: row.visibility,
       status: row.status,
       created_at: row.created_at,

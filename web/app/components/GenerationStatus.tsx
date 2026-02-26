@@ -93,6 +93,22 @@ export function GenerationStatus({ conversationId, onComplete }: GenerationStatu
           if (!hasCompletedRef.current) {
             hasCompletedRef.current = true;
             onCompleteRef.current?.();
+
+            // 发送渲染完成事件到前端（用于一键生成功能的进度更新）
+            if (typeof window !== 'undefined') {
+              // 为每个完成的任务发送事件
+              data.tasks
+                .filter(task => task.status === 'completed' && task.category === 'render')
+                .forEach(task => {
+                  window.dispatchEvent(new CustomEvent('render-complete', {
+                    detail: {
+                      conversationId,
+                      template: task.type,
+                      imageUrl: 'completed', // 标记为完成
+                    }
+                  }));
+                });
+            }
           }
         } else {
           setPolling(true);

@@ -1,5 +1,38 @@
 // 模板管理器
 // 注意：在 Node.js 环境中运行，不使用 DOM API
+import { marked } from 'marked';
+
+/**
+ * 安全地将 Markdown 转换为 HTML
+ * 防止 XSS 攻击，只允许安全的 Markdown 标签
+ */
+function markdownToHtml(markdown: string): string {
+  if (!markdown) return '';
+
+  // 配置 marked 选项，启用 GFM（GitHub Flavored Markdown）
+  marked.use({
+    gfm: true, // GitHub Flavored Markdown
+    breaks: true, // 支持 \n 换行
+  });
+
+  // 转换 Markdown 为 HTML
+  const html = marked.parse(markdown) as string;
+
+  return html;
+}
+
+/**
+ * 安全地转义 HTML 特殊字符
+ * 用于防止 XSS 攻击
+ */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 
 /**
  * 模板类型
@@ -22,6 +55,7 @@ export interface TemplateData {
   messageCount: number;
   capturedAt: string;
   imageUrl?: string;
+  title?: string;
 }
 
 /**
@@ -65,23 +99,23 @@ export class BentoTemplate implements HTMLTemplate {
       justify-content: center;
       align-items: center;
       min-height: 100vh;
-      padding: 40px;
+      padding: 15px;
     }
 
     .bento-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       grid-template-rows: auto auto auto;
-      gap: 20px;
-      max-width: 900px;
+      gap: 24px;
+      max-width: 1000px;
       width: 100%;
-      padding: 40px;
+      padding: 0;
     }
 
     .card {
       background: white;
-      border-radius: 24px;
-      padding: 32px;
+      border-radius: 16px;
+      padding: 36px;
       box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
     }
 
@@ -95,14 +129,14 @@ export class BentoTemplate implements HTMLTemplate {
     .platform-badge {
       display: flex;
       align-items: center;
-      gap: 12px;
-      font-size: 36px;
+      gap: 18px;
+      font-size: 42px;
       font-weight: 700;
       color: #667eea;
     }
 
     .conversation-id {
-      font-size: 38px;
+      font-size: 36px;
       color: #999;
     }
 
@@ -111,34 +145,93 @@ export class BentoTemplate implements HTMLTemplate {
     }
 
     .summary {
-      font-size: 28px;
+      font-size: 54px;
       line-height: 1.6;
       color: #333;
       white-space: pre-wrap;
     }
 
+    /* Markdown 样式 */
+    .markdown-content h1,
+    .markdown-content h2,
+    .markdown-content h3 {
+      margin-top: 24px;
+      margin-bottom: 12px;
+      font-weight: 700;
+      color: #222;
+    }
+
+    .markdown-content h1 { font-size: 63px; line-height: 1.2; }
+    .markdown-content h2 { font-size: 54px; line-height: 1.2; }
+    .markdown-content h3 { font-size: 45px; line-height: 1.2; }
+
+    .markdown-content p { margin-bottom: 18px; }
+
+    .markdown-content ul,
+    .markdown-content ol {
+      margin-left: 36px;
+      margin-bottom: 18px;
+    }
+
+    .markdown-content li { margin-bottom: 9px; }
+
+    .markdown-content code {
+      background: #f4f4f4;
+      padding: 3px 9px;
+      border-radius: 6px;
+      font-family: 'Courier New', monospace;
+      font-size: 36px;
+    }
+
+    .markdown-content pre {
+      background: #2d2d2d;
+      color: #f8f8f2;
+      padding: 24px;
+      border-radius: 12px;
+      overflow-x: auto;
+      margin-bottom: 18px;
+    }
+
+    .markdown-content pre code {
+      background: transparent;
+      padding: 0;
+      color: inherit;
+    }
+
+    .markdown-content blockquote {
+      border-left: 6px solid #667eea;
+      padding-left: 24px;
+      margin: 18px 0;
+      color: #666;
+      font-style: italic;
+    }
+
+    .markdown-content strong { font-weight: 700; color: #222; }
+    .markdown-content em { font-style: italic; }
+    .markdown-content a { color: #667eea; text-decoration: underline; }
+
     .card-meta {
       grid-column: 1 / 2;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 12px;
     }
 
     .meta-item {
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 6px;
     }
 
     .meta-label {
-      font-size: 64px;
+      font-size: 36px;
       color: #999;
       text-transform: uppercase;
-      letter-spacing: 1px;
+      letter-spacing: 1.5px;
     }
 
     .meta-value {
-      font-size: 28px;
+      font-size: 42px;
       font-weight: 600;
       color: #333;
     }
@@ -175,7 +268,7 @@ export class BentoTemplate implements HTMLTemplate {
     </div>
 
     <div class="card card-main">
-      <div class="summary">${this.escapeHtml(data.socialMediaSummary || '暂无摘要')}</div>
+      <div class="summary markdown-content">${data.socialMediaSummary ? markdownToHtml(data.socialMediaSummary) : '暂无摘要'}</div>
     </div>
 
     <div class="card card-meta">
@@ -211,15 +304,6 @@ export class BentoTemplate implements HTMLTemplate {
     };
     return icons[platform] || '🤖';
   }
-
-  private escapeHtml(text: string): string {
-    return text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
-  }
 }
 
 /**
@@ -249,55 +333,114 @@ export class NewsletterTemplate implements HTMLTemplate {
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Georgia', serif;
       background: #f5f5f5;
-      padding: 40px 20px;
+      padding: 15px;
     }
 
     .container {
-      max-width: 600px;
+      max-width: 700px;
       margin: 0 auto;
       background: white;
-      border-radius: 12px;
+      border-radius: 18px;
       overflow: hidden;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      box-shadow: 0 6px 30px rgba(0, 0, 0, 0.08);
     }
 
     .header {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
-      padding: 40px;
+      padding: 30px;
       text-align: center;
     }
 
     .header h1 {
-      font-size: 64px;
-      margin-bottom: 8px;
+      font-size: 96px;
+      margin-bottom: 12px;
     }
 
     .header .subtitle {
-      font-size: 22px;
+      font-size: 33px;
       opacity: 0.9;
     }
 
     .content {
-      padding: 40px;
+      padding: 30px;
     }
 
     .meta {
       display: flex;
       justify-content: space-between;
-      padding-bottom: 20px;
-      border-bottom: 2px solid #f0f0f0;
-      margin-bottom: 20px;
-      font-size: 64px;
+      padding-bottom: 24px;
+      border-bottom: 3px solid #f0f0f0;
+      margin-bottom: 24px;
+      font-size: 36px;
       color: #999;
     }
 
     .summary {
-      font-size: 26px;
+      font-size: 54px;
       line-height: 1.8;
       color: #333;
       white-space: pre-wrap;
     }
+
+    /* Markdown 样式 */
+    .markdown-content h1,
+    .markdown-content h2,
+    .markdown-content h3 {
+      margin-top: 24px;
+      margin-bottom: 12px;
+      font-weight: 700;
+      color: #222;
+    }
+
+    .markdown-content h1 { font-size: 63px; line-height: 1.2; }
+    .markdown-content h2 { font-size: 54px; line-height: 1.2; }
+    .markdown-content h3 { font-size: 45px; line-height: 1.2; }
+
+    .markdown-content p { margin-bottom: 18px; }
+
+    .markdown-content ul,
+    .markdown-content ol {
+      margin-left: 36px;
+      margin-bottom: 18px;
+    }
+
+    .markdown-content li { margin-bottom: 9px; }
+
+    .markdown-content code {
+      background: #f4f4f4;
+      padding: 3px 9px;
+      border-radius: 6px;
+      font-family: 'Courier New', monospace;
+      font-size: 36px;
+    }
+
+    .markdown-content pre {
+      background: #2d2d2d;
+      color: #f8f8f2;
+      padding: 24px;
+      border-radius: 12px;
+      overflow-x: auto;
+      margin-bottom: 18px;
+    }
+
+    .markdown-content pre code {
+      background: transparent;
+      padding: 0;
+      color: inherit;
+    }
+
+    .markdown-content blockquote {
+      border-left: 6px solid #667eea;
+      padding-left: 24px;
+      margin: 18px 0;
+      color: #666;
+      font-style: italic;
+    }
+
+    .markdown-content strong { font-weight: 700; color: #222; }
+    .markdown-content em { font-style: italic; }
+    .markdown-content a { color: #667eea; text-decoration: underline; }
 
     .footer {
       background: #f9f9f9;
@@ -322,7 +465,7 @@ export class NewsletterTemplate implements HTMLTemplate {
         <span>🤖 ${data.platform}</span>
       </div>
 
-      <div class="summary">${this.escapeHtml(data.socialMediaSummary || '暂无摘要')}</div>
+      <div class="summary markdown-content">${data.socialMediaSummary ? markdownToHtml(data.socialMediaSummary) : '暂无摘要'}</div>
     </div>
 
     <div class="footer">
@@ -332,15 +475,6 @@ export class NewsletterTemplate implements HTMLTemplate {
 </body>
 </html>
     `.trim();
-  }
-
-  private escapeHtml(text: string): string {
-    return text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
   }
 }
 
@@ -375,16 +509,16 @@ export class RetroLetterTemplate implements HTMLTemplate {
       background: #f4e4bc;
       background-image:
         repeating-linear-gradient(0deg, transparent, transparent 29px, rgba(139, 69, 19, 0.1) 30px);
-      padding: 60px 40px;
+      padding: 15px;
       min-height: 100vh;
     }
 
     .paper {
-      max-width: 700px;
+      max-width: 800px;
       margin: 0 auto;
       background: #fffef0;
-      padding: 60px;
-      box-shadow: 0 0 40px rgba(0, 0, 0, 0.1);
+      padding: 36px;
+      box-shadow: 0 0 60px rgba(0, 0, 0, 0.1);
       position: relative;
     }
 
@@ -392,41 +526,100 @@ export class RetroLetterTemplate implements HTMLTemplate {
       content: '';
       position: absolute;
       top: 0;
-      left: 60px;
+      left: 90px;
       right: 0;
       bottom: 0;
-      border-left: 2px solid rgba(255, 0, 0, 0.2);
+      border-left: 3px solid rgba(255, 0, 0, 0.2);
     }
 
     .header {
       text-align: center;
-      margin-bottom: 40px;
-      padding-left: 20px;
+      margin-bottom: 30px;
+      padding-left: 15px;
     }
 
     .header h1 {
       font-family: 'Caveat', cursive;
-      font-size: 64px;
+      font-size: 96px;
       color: #8b4513;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
 
     .header .meta {
-      font-size: 22px;
+      font-size: 33px;
       color: #999;
       font-style: italic;
     }
 
     .content {
-      padding-left: 40px;
+      padding-left: 60px;
       line-height: 2;
     }
 
     .summary {
-      font-size: 26px;
+      font-size: 54px;
       color: #333;
       white-space: pre-wrap;
     }
+
+    /* Markdown 样式 */
+    .markdown-content h1,
+    .markdown-content h2,
+    .markdown-content h3 {
+      margin-top: 24px;
+      margin-bottom: 12px;
+      font-weight: 700;
+      color: #8b4513;
+    }
+
+    .markdown-content h1 { font-size: 63px; line-height: 1.2; }
+    .markdown-content h2 { font-size: 54px; line-height: 1.2; }
+    .markdown-content h3 { font-size: 45px; line-height: 1.2; }
+
+    .markdown-content p { margin-bottom: 18px; }
+
+    .markdown-content ul,
+    .markdown-content ol {
+      margin-left: 36px;
+      margin-bottom: 18px;
+    }
+
+    .markdown-content li { margin-bottom: 9px; }
+
+    .markdown-content code {
+      background: #f4e4bc;
+      padding: 3px 9px;
+      border-radius: 6px;
+      font-family: 'Courier New', monospace;
+      font-size: 36px;
+    }
+
+    .markdown-content pre {
+      background: #8b4513;
+      color: #fffef0;
+      padding: 24px;
+      border-radius: 12px;
+      overflow-x: auto;
+      margin-bottom: 18px;
+    }
+
+    .markdown-content pre code {
+      background: transparent;
+      padding: 0;
+      color: inherit;
+    }
+
+    .markdown-content blockquote {
+      border-left: 6px solid #8b4513;
+      padding-left: 24px;
+      margin: 18px 0;
+      color: #666;
+      font-style: italic;
+    }
+
+    .markdown-content strong { font-weight: 700; color: #8b4513; }
+    .markdown-content em { font-style: italic; }
+    .markdown-content a { color: #8b4513; text-decoration: underline; }
 
     .footer {
       margin-top: 40px;
@@ -447,7 +640,7 @@ export class RetroLetterTemplate implements HTMLTemplate {
     </div>
 
     <div class="content">
-      <div class="summary">${this.escapeHtml(data.socialMediaSummary || '暂无摘要')}</div>
+      <div class="summary markdown-content">${data.socialMediaSummary ? markdownToHtml(data.socialMediaSummary) : '暂无摘要'}</div>
     </div>
 
     <div class="footer">
@@ -457,15 +650,6 @@ export class RetroLetterTemplate implements HTMLTemplate {
 </body>
 </html>
     `.trim();
-  }
-
-  private escapeHtml(text: string): string {
-    return text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
   }
 }
 
@@ -497,90 +681,148 @@ export class XiaohongshuTemplate implements HTMLTemplate {
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
       background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 50%, #FFA726 100%);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      padding: 30px;
+      display: block;
+      padding: 15px;
+      margin: 0;
     }
 
     .xhs-card {
       background: white;
-      border-radius: 20px;
+      border-radius: 24px;
       width: 100%;
-      max-width: 500px;
-      padding: 40px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 36px;
+      box-shadow: 0 30px 90px rgba(0, 0, 0, 0.2);
     }
 
     .header {
-      margin-bottom: 30px;
+      margin-bottom: 24px;
     }
 
     .platform-badge {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
+      gap: 18px;
       background: linear-gradient(135deg, #FF6B6B, #FF8E53);
       color: white;
-      padding: 8px 16px;
-      border-radius: 20px;
-      font-size: 20px;
+      padding: 18px 36px;
+      border-radius: 36px;
+      font-size: 42px;
       font-weight: 600;
-      margin-bottom: 16px;
+      margin-bottom: 15px;
     }
 
     .title {
-      font-size: 32px;
+      font-size: 72px;
       font-weight: 700;
       color: #333;
-      line-height: 1.4;
-      margin-bottom: 8px;
+      line-height: 1.2;
+      margin-bottom: 12px;
     }
 
     .meta {
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 36px;
       color: #999;
-      font-size: 18px;
+      font-size: 36px;
     }
 
     .meta-item {
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 9px;
     }
 
     .content {
-      margin-bottom: 30px;
+      margin-bottom: 24px;
     }
 
     .summary {
-      font-size: 24px;
-      line-height: 1.8;
+      font-size: 54px;
+      line-height: 1.5;
       color: #333;
       white-space: pre-wrap;
     }
 
+    /* Markdown 样式 */
+    .markdown-content h1,
+    .markdown-content h2,
+    .markdown-content h3 {
+      margin-top: 24px;
+      margin-bottom: 12px;
+      font-weight: 700;
+      color: #333;
+    }
+
+    .markdown-content h1 { font-size: 63px; line-height: 1.2; }
+    .markdown-content h2 { font-size: 54px; line-height: 1.2; }
+    .markdown-content h3 { font-size: 45px; line-height: 1.2; }
+
+    .markdown-content p { margin-bottom: 18px; }
+
+    .markdown-content ul,
+    .markdown-content ol {
+      margin-left: 42px;
+      margin-bottom: 18px;
+    }
+
+    .markdown-content li { margin-bottom: 9px; }
+
+    .markdown-content code {
+      background: #F5F5F5;
+      padding: 4.5px 9px;
+      border-radius: 9px;
+      font-family: 'Courier New', monospace;
+      font-size: 42px;
+    }
+
+    .markdown-content pre {
+      background: #2d2d2d;
+      color: #f8f8f2;
+      padding: 24px;
+      border-radius: 18px;
+      overflow-x: auto;
+      margin-bottom: 18px;
+    }
+
+    .markdown-content pre code {
+      background: transparent;
+      padding: 0;
+      color: inherit;
+    }
+
+    .markdown-content blockquote {
+      border-left: 6px solid #FF6B6B;
+      padding-left: 24px;
+      margin: 18px 0;
+      color: #666;
+      font-style: italic;
+    }
+
+    .markdown-content strong { font-weight: 700; color: #222; }
+    .markdown-content em { font-style: italic; }
+    .markdown-content a { color: #FF6B6B; text-decoration: underline; }
+
     .tags {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 24px;
+      gap: 10px;
+      margin-top: 20px;
     }
 
     .tag {
       background: #F5F5F5;
       color: #666;
-      padding: 6px 12px;
-      border-radius: 12px;
-      font-size: 16px;
+      padding: 8px 20px;
+      border-radius: 16px;
+      font-size: 22px;
       font-weight: 500;
     }
 
     .footer {
-      padding-top: 20px;
+      padding-top: 16px;
       border-top: 1px solid #F0F0F0;
       display: flex;
       justify-content: space-between;
@@ -588,12 +830,12 @@ export class XiaohongshuTemplate implements HTMLTemplate {
     }
 
     .watermark {
-      font-size: 16px;
+      font-size: 20px;
       color: #999;
     }
 
     .emoji {
-      font-size: 24px;
+      font-size: 28px;
     }
   </style>
 </head>
@@ -604,7 +846,7 @@ export class XiaohongshuTemplate implements HTMLTemplate {
         <span>${platformIcon}</span>
         <span>${data.platform}</span>
       </div>
-      <h1 class="title">AI 对话摘要 #${data.conversationId}</h1>
+      <h1 class="title">${escapeHtml(data.title || `AI 对话摘要 #${data.conversationId}`)}</h1>
       <div class="meta">
         <span class="meta-item">📅 ${date}</span>
         <span class="meta-item">💬 ${data.messageCount}条消息</span>
@@ -612,7 +854,7 @@ export class XiaohongshuTemplate implements HTMLTemplate {
     </div>
 
     <div class="content">
-      <div class="summary">${this.escapeHtml(data.socialMediaSummary || '暂无摘要')}</div>
+      <div class="summary markdown-content">${data.socialMediaSummary ? markdownToHtml(data.socialMediaSummary) : '暂无摘要'}</div>
       <div class="tags">
         <span class="tag">#AI对话</span>
         <span class="tag">#智能助手</span>
@@ -636,15 +878,6 @@ export class XiaohongshuTemplate implements HTMLTemplate {
       Doubao: '🫘',
     };
     return icons[platform] || '🤖';
-  }
-
-  private escapeHtml(text: string): string {
-    return text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
   }
 }
 

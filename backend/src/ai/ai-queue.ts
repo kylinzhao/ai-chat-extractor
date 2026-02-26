@@ -223,8 +223,56 @@ export class AITaskQueue {
         const conversationRepo = new ConversationRepository();
 
         if (task.type === AITaskType.SOCIAL_MEDIA_SUMMARY) {
-          conversationRepo.update(task.conversationId, { social_media_summary: response.content });
-          console.log(`[AI Queue] Saved social_media_summary to database for conversation ${task.conversationId}`);
+          // 尝试解析 JSON 格式响应
+          let summaryContent = response.content;
+          let titleContent: string | undefined;
+
+          try {
+            // 尝试从响应中提取 JSON
+            let jsonStr = response.content;
+
+            // 如果响应包含 markdown 代码块，提取其中的 JSON
+            const jsonMatch = response.content.match(/```json\s*([\s\S]*?)\s*```/);
+            if (jsonMatch) {
+              jsonStr = jsonMatch[1];
+            } else {
+              // 尝试直接查找 JSON 对象
+              const objectMatch = response.content.match(/\{[\s\S]*\}/);
+              if (objectMatch) {
+                jsonStr = objectMatch[0];
+              }
+            }
+
+            const parsed = JSON.parse(jsonStr);
+            if (parsed.summary && parsed.title) {
+              summaryContent = parsed.summary;
+              titleContent = parsed.title;
+              console.log(`[AI Queue] Parsed JSON response: title="${titleContent}"`);
+            } else {
+              throw new Error('Invalid JSON structure');
+            }
+          } catch (parseError) {
+            // JSON 解析失败，回退到提取第一句话作为 title
+            console.warn(`[AI Queue] Failed to parse JSON response, using fallback: ${parseError}`);
+
+            // 提取第一句话（到第一个句号、问号或感叹号）
+            const firstSentenceMatch = response.content.match(/^.+?[。？！.!?]/);
+            if (firstSentenceMatch) {
+              titleContent = firstSentenceMatch[0].trim();
+            } else {
+              // 如果没有句子结束符，取前 15 个字符
+              titleContent = response.content.substring(0, Math.min(15, response.content.length)).trim();
+            }
+
+            console.log(`[AI Queue] Generated fallback title: "${titleContent}"`);
+          }
+
+          // 保存摘要和标题
+          conversationRepo.update(task.conversationId, {
+            social_media_summary: summaryContent,
+            title: titleContent
+          });
+          console.log(`[AI Queue] Saved social_media_summary and title to database for conversation ${task.conversationId}`);
         } else if (task.type === AITaskType.DETAILED_SUMMARY) {
           conversationRepo.update(task.conversationId, { detailed_summary: response.content });
           console.log(`[AI Queue] Saved detailed_summary to database for conversation ${task.conversationId}`);
@@ -232,20 +280,44 @@ export class AITaskQueue {
 
         // 检查是否所有 AI 任务都已完成
         const allTasks = this.getConversationTasks(task.conversationId);
-        const allAITasks = allTasks.filter(t => t.category === 'ai');
+        const allAITasks = allTasks;
         const allCompleted = allAITasks.every(t => t.status === AITaskStatus.COMPLETED || t.status === AITaskStatus.FAILED);
 
-        if (allCompleted && allAITasks.length > 0) {
-          // 获取渲染任务
-          const { getRenderQueue } = require('../rendering/render-queue');
+        if (allCompleted && allAITasks.length >= 2) {
+          // 所有 AI 任务已完成，触发渲染任务
+          const { getRenderQueue, RenderTaskType } = require('../rendering/render-queue');
           const renderQueue = getRenderQueue();
-          const allRenderTasks = renderQueue.getConversationTasks(task.conversationId);
-          const allRenderCompleted = allRenderTasks.every(t => t.status === 'completed' || t.status === 'failed');
 
-          // 如果 AI 和渲染任务都完成了，更新 conversation status
-          if (allRenderCompleted || allRenderTasks.length === 0) {
-            conversationRepo.update(task.conversationId, { status: 'completed' });
-            console.log(`[AI Queue] Updated conversation ${task.conversationId} status to 'completed'`);
+          // 检查是否已经有渲染任务
+          const existingRenderTasks = renderQueue.getConversationTasks(task.conversationId);
+          if (existingRenderTasks.length === 0) {
+            // 从数据库重新获取对话数据（包含刚生成的摘要）
+            const updatedConversation = conversationRepo.findById(task.conversationId);
+            if (updatedConversation) {
+              const renderData = {
+                conversationId: updatedConversation.id || task.conversationId,
+                platform: updatedConversation.platform,
+                socialMediaSummary: updatedConversation.social_media_summary || '',
+                detailedSummary: updatedConversation.detailed_summary || '',
+                messageCount: updatedConversation.messages.length,
+                capturedAt: updatedConversation.captured_at,
+                imageUrl: updatedConversation.image_urls?.[0] || '',
+                title: updatedConversation.title || '',
+              };
+
+              // 生成所有 4 种模板（包括小红书）
+              renderQueue.addTask(RenderTaskType.BENTO, renderData);
+              console.log(`[AI Queue] Triggered bento render task for conversation ${task.conversationId}`);
+
+              renderQueue.addTask(RenderTaskType.NEWSLETTER, renderData);
+              console.log(`[AI Queue] Triggered newsletter render task for conversation ${task.conversationId}`);
+
+              renderQueue.addTask(RenderTaskType.RETRO_LETTER, renderData);
+              console.log(`[AI Queue] Triggered retro_letter render task for conversation ${task.conversationId}`);
+
+              renderQueue.addTask(RenderTaskType.XIAOHONGSHU, renderData);
+              console.log(`[AI Queue] Triggered xiaohongshu render task for conversation ${task.conversationId}`);
+            }
           }
         }
       } catch (dbError) {

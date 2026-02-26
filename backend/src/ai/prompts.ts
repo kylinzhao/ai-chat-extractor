@@ -158,8 +158,8 @@ export const DETAILED_SUMMARY_TEMPLATE: PromptTemplate = {
  */
 export const SOCIAL_MEDIA_SUMMARY_TEMPLATE: PromptTemplate = {
   name: 'social_media_summary',
-  description: '生成适合社交媒体分享的精简摘要（140-280 字）',
-  systemPrompt: `你是一个社交媒体内容编辑。你的任务是将 AI 对话转换为精简、有吸引力的社媒分享文案。
+  description: '生成适合社交媒体分享的精简摘要（140-280 字）和标题',
+  systemPrompt: `你是一个社交媒体内容编辑。你的任务是将 AI 对话转换为精简、有吸引力的社媒分享文案和标题。
 
 **要求：**
 1. 总字数控制在 140-280 字之间（适合微博、Twitter、朋友圈）
@@ -173,31 +173,42 @@ export const SOCIAL_MEDIA_SUMMARY_TEMPLATE: PromptTemplate = {
 9. 如果有技术内容，用通俗语言解释
 10. 适当添加标签（#）
 
+**标题要求：**
+- 10-20 个中文字符
+- 简洁有力，能吸引点击
+- 包含对话的核心主题
+- 避免使用 "AI 对话摘要" 这种通用标题
+
 **语气风格参考：**
 - 轻松但不轻浮
 - 专业但不死板
 - 有观点但不偏激
 - 有温度但不矫情
 
+**输出格式（必须是严格的 JSON）：**
+\`\`\`json
+{
+  "title": "标题（10-20字）",
+  "summary": "社媒分享文案（140-280字）"
+}
+\`\`\`
+
 **示例结构：**
-🤖 刚用 [工具] 解决了 [问题]，分享几个要点：
-
-1️⃣ [要点1]
-2️⃣ [要点2]
-3️⃣ [要点3]
-
-[个人感悟或补充信息]
-
-#标签1 #标签2`,
+\`\`\`json
+{
+  "title": "用 React 19 新特性重构组件，性能提升 300%",
+  "summary": "🤖 刚用 React 19 的新特性重构了老项目，性能提升显著：\\n\\n1️⃣ use() Hook 替代 useEffect，代码减少 40%\\n2️⃣ 自动状态批处理，渲染次数减半\\n3️⃣ 服务器组件优化首屏加载\\n\\n最大的感受是：并发渲染真的香！\\n\\n#React #前端开发"
+}
+\`\`\``,
   getUserPrompt: (variables: PromptVariables) => {
     let topicHint = '';
     if (variables.conversationTopic) {
       topicHint = `\n主题提示：${variables.conversationTopic}`;
     }
 
-    return `请将以下来自 ${variables.platform} 的 AI 对话（共 ${variables.messageCount} 条消息${variables.hasImages ? '，包含图片' : ''}）转换为精简的社媒分享文案。${topicHint}
+    return `请将以下来自 ${variables.platform} 的 AI 对话（共 ${variables.messageCount} 条消息${variables.hasImages ? '，包含图片' : ''}）转换为精简的社媒分享文案和标题。${topicHint}
 
-对话内容将以 JSON 格式提供，请仔细阅读并按照系统提示的要求生成文案。`;
+对话内容将以 JSON 格式提供，请仔细阅读并按照系统提示的要求生成 JSON 格式的响应。`;
   },
   forbiddenWords: FORBIDDEN_WORDS,
 };

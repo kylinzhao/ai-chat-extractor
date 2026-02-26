@@ -74,6 +74,7 @@ export async function renderRoutes(fastify: FastifyInstance) {
         messageCount: conversation.messages.length,
         capturedAt: conversation.captured_at,
         imageUrl: conversation.image_urls?.[0],
+        title: conversation.title || undefined,
       };
 
       // 将任务添加到队列

@@ -35,6 +35,15 @@ export interface RenderTaskData {
   messageCount: number;
   capturedAt: string;
   imageUrl?: string;
+  title?: string;
+}
+
+/**
+ * 渲染任务依赖
+ */
+export interface RenderTaskDependency {
+  conversationId: number;
+  aiTaskTypes: RenderTaskType[];
 }
 
 /**
@@ -45,6 +54,7 @@ export interface RenderTask {
   type: RenderTaskType;
   data: RenderTaskData;
   status: RenderTaskStatus;
+  dependencies?: RenderTaskDependency; // 任务依赖
   result?: {
     imagePath: string;
     imageUrl: string;
@@ -146,6 +156,50 @@ export class RenderQueue {
   }
 
   /**
+   * 检查任务依赖是否满足
+   */
+  private canExecute(task: RenderTask): boolean {
+    // 如果没有依赖，可以执行
+    if (!task.dependencies) {
+      return true;
+    }
+
+    // 检查是否超时（等待超过 5 分钟）
+    const timeout = 5 * 60 * 1000; // 5 分钟
+    if (Date.now() - task.createdAt.getTime() > timeout) {
+      console.warn(
+        `[Render Queue] 任务 ${task.id} 等待依赖超时，标记为失败`
+      );
+      task.status = RenderTaskStatus.FAILED;
+      task.error = 'Dependency timeout after 5 minutes';
+      task.completedAt = new Date();
+      return false;
+    }
+
+    // 检查 AI 任务是否完成
+    const { getAITaskQueue } = require('../ai/ai-queue');
+    const aiQueue = getAITaskQueue();
+    const aiTasks = aiQueue.getConversationTasks(task.data.conversationId);
+
+    // 只需要 social_media_summary 完成就可以开始渲染
+    const socialMediaSummaryTask = aiTasks.find(
+      (t: any) => t.type === 'social_media_summary'
+    );
+
+    const isReady = socialMediaSummaryTask &&
+      (socialMediaSummaryTask.status === 'completed' || socialMediaSummaryTask.status === 'failed');
+
+    if (!isReady) {
+      const status = socialMediaSummaryTask?.status || 'not found';
+      console.log(
+        `[Render Queue] 任务 ${task.id} 等待 social_media_summary 完成 (当前状态: ${status})`
+      );
+    }
+
+    return isReady;
+  }
+
+  /**
    * 获取下一个待处理任务
    */
   private getNextTask(): RenderTask | null {
@@ -155,6 +209,13 @@ export class RenderQueue {
     }
 
     const task = this.queue[taskIndex];
+
+    // 检查依赖是否满足
+    if (!this.canExecute(task)) {
+      // 依赖未满足，跳过此任务
+      return null;
+    }
+
     task.status = RenderTaskStatus.PROCESSING;
     task.startedAt = new Date();
     this.processing.set(task.id, task);
@@ -176,6 +237,16 @@ export class RenderQueue {
       const instance = await manager.acquire();
 
       try {
+        // 设置固定视口（3:4 宽高比，参考小红书流行尺寸）
+        const VIEWPORT_WIDTH = 1080;
+        const VIEWPORT_HEIGHT = 1440; // 1080:1440 = 3:4 比例
+
+        await instance.page.setViewport({
+          width: VIEWPORT_WIDTH,
+          height: VIEWPORT_HEIGHT,
+          deviceScaleFactor: 2, // 2x 像素密度，提高清晰度
+        });
+
         // 获取 HTML 模板（转换类型）
         const template = getTemplate(task.type as unknown as TemplateType);
         const html = template.generateHTML(task.data);
@@ -189,38 +260,199 @@ export class RenderQueue {
         // 等待字体加载
         await instance.page.evaluateHandle('document.fonts.ready');
 
-        // 确保渲染目录存在
-        const rendersDir = join(__dirname, '../../public/renders');
-        await mkdir(rendersDir, { recursive: true });
-
-        // 生成文件名：conversationId-templateType-timestamp.png
-        const filename = `${task.data.conversationId}-${task.type}-${Date.now()}.png`;
-        const imagePath = join(rendersDir, filename);
-        const imageUrl = `/public/renders/${filename}`;
-
-        // 生成截图并保存到文件
-        const buffer = await instance.page.screenshot({
-          type: 'png',
+        // 计算内容高度并决定是否分页
+        // @ts-ignore - 代码在浏览器环境中执行
+        const contentInfo = await instance.page.evaluate(() => {
+          // @ts-ignore
+          const body = document.body;
+          // @ts-ignore
+          const content = body.querySelector('.summary, .markdown-content, .content');
+          return {
+            totalHeight: body.scrollHeight,
+            contentHeight: content ? content.scrollHeight : 0,
+            bodyHeight: body.offsetHeight,
+            scrollWidth: body.scrollWidth
+          };
         });
-        await writeFile(imagePath, buffer);
 
-        // 保存结果
-        task.result = {
-          imagePath,
-          imageUrl,
-        };
+        // 设置每页最大高度
+        const MAX_PAGE_HEIGHT = 3000; // 每页最大 3000px
+        const needsPagination = contentInfo.totalHeight > MAX_PAGE_HEIGHT;
 
-        // 追加图片 URL 到对话
+        let imageUrls: string[] = [];
+
+        if (needsPagination) {
+          // 需要分页 - 为每页创建完整的容器结构
+          const pageCount = Math.ceil(contentInfo.totalHeight / MAX_PAGE_HEIGHT);
+          console.log(`[Render Queue] 内容过长 (${contentInfo.totalHeight}px)，将分 ${pageCount} 页渲染`);
+
+          // 确保渲染目录存在
+          const rendersDir = join(__dirname, '../../public/renders');
+          await mkdir(rendersDir, { recursive: true });
+
+          const timestamp = Date.now();
+
+          // 逐页截图 - 每页都使用完整的视口
+          for (let pageNum = 1; pageNum <= pageCount; pageNum++) {
+            // 使用 JavaScript 控制只显示当前页的内容
+            // @ts-ignore - 代码在浏览器环境中执行
+            await instance.page.evaluate((currentPage: any, totalPages: any, maxPageHeight: any) => {
+              // @ts-ignore
+              const doc: any = document;
+              const content = doc.querySelector('.summary, .markdown-content, .content');
+              if (!content) return;
+
+              // 保存原始样式以便恢复
+              const originalOverflow = content.style.overflow;
+              const originalPosition = content.style.position;
+
+              // 设置原始内容容器为固定高度，避免其影响截图
+              content.style.overflow = 'hidden';
+              content.style.height = `${maxPageHeight}px`;
+
+              // 创建一个克隆的内容容器，只包含当前页的内容
+              const originalContent = content.innerHTML;
+              const wrapper = doc.createElement('div');
+              wrapper.style.position = 'relative';  // 使用 relative 定位
+              wrapper.style.width = '100%';
+              // 修复：使用完整的视口高度，而不是当前页内容高度
+              // 这样可以确保每一页都使用相同的容器尺寸
+              wrapper.style.height = `${maxPageHeight}px`;
+              wrapper.style.overflow = 'hidden';
+
+              // 创建内容副本，并设置偏移
+              const clonedContent = doc.createElement('div');
+              clonedContent.innerHTML = originalContent;
+              clonedContent.style.position = 'absolute';
+              clonedContent.style.top = `-${(currentPage - 1) * maxPageHeight}px`;
+              clonedContent.style.left = '0';
+              clonedContent.style.width = '100%';
+              clonedContent.className = content.className;
+
+              wrapper.appendChild(clonedContent);
+
+              // 隐藏原始内容，显示分页内容
+              content.style.visibility = 'hidden';
+              content.parentElement?.insertBefore(wrapper, content.nextSibling);
+
+              // @ts-ignore - 存储引用以便恢复
+              const win: any = window;
+              win._paginationWrapper = wrapper;
+              win._paginationContent = content;
+              win._originalOverflow = originalOverflow;
+              win._originalPosition = originalPosition;
+            }, pageNum, pageCount, MAX_PAGE_HEIGHT);
+
+            // 等待 DOM 更新
+            await new Promise(resolve => setTimeout(resolve, 200));
+
+            // 生成文件名：conversationId-templateType-pageNum-timestamp.png
+            const filename = `${task.data.conversationId}-${task.type}-${pageNum}-${timestamp}.png`;
+            const imagePath = join(rendersDir, filename);
+            const imageUrl = `/public/renders/${filename}`;
+
+            // 截图完整视口（固定尺寸 1080x1440）
+            const buffer = await instance.page.screenshot({
+              type: 'png',
+            });
+
+            await writeFile(imagePath, buffer);
+            imageUrls.push(imageUrl);
+
+            console.log(`[Render Queue] 第 ${pageNum}/${pageCount} 页完成，保存到 ${imageUrl}`);
+
+            // 恢复原始内容
+            // @ts-ignore - 代码在浏览器环境中执行
+            await instance.page.evaluate(() => {
+              // @ts-ignore
+              const win: any = window;
+              const wrapper = win._paginationWrapper;
+              const content = win._paginationContent;
+              if (wrapper && content) {
+                wrapper.remove();
+                content.style.visibility = 'visible';
+                // 恢复原始样式
+                if (win._originalOverflow !== undefined) {
+                  content.style.overflow = win._originalOverflow;
+                }
+                if (win._originalPosition !== undefined) {
+                  content.style.position = win._originalPosition;
+                }
+                // 清除设置的 height
+                content.style.height = '';
+              }
+              delete win._paginationWrapper;
+              delete win._paginationContent;
+              delete win._originalOverflow;
+              delete win._originalPosition;
+            });
+
+            // 等待 DOM 恢复
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+
+          // 只保存第一个 URL 作为结果（兼容现有逻辑）
+          task.result = {
+            imagePath: join(__dirname, '../../public', imageUrls[0]),
+            imageUrl: imageUrls[0],
+          };
+        } else {
+          // 不需要分页，单页渲染（使用完整视口高度）
+          const rendersDir = join(__dirname, '../../public/renders');
+          await mkdir(rendersDir, { recursive: true });
+
+          // 生成文件名：conversationId-templateType-timestamp.png
+          const filename = `${task.data.conversationId}-${task.type}-${Date.now()}.png`;
+          const imagePath = join(rendersDir, filename);
+          const imageUrl = `/public/renders/${filename}`;
+
+          // 使用完整视口截图（3:4 比例）
+          const buffer = await instance.page.screenshot({
+            type: 'png',
+            clip: {
+              x: 0,
+              y: 0,
+              width: VIEWPORT_WIDTH,
+              height: VIEWPORT_HEIGHT
+            }
+          });
+          await writeFile(imagePath, buffer);
+
+          imageUrls.push(imageUrl);
+
+          // 保存结果
+          task.result = {
+            imagePath,
+            imageUrl,
+          };
+
+          console.log(`[Render Queue] 单页渲染完成，保存到 ${imageUrl}`);
+        }
+
+        // 追加所有图片 URL 到对话
         const conversationRepo = new ConversationRepository();
-        conversationRepo.appendImageUrl(task.data.conversationId, imageUrl);
+        for (const url of imageUrls) {
+          conversationRepo.appendImageUrl(task.data.conversationId, url);
+        }
 
         task.renderTime = Date.now() - startTime;
         task.status = RenderTaskStatus.COMPLETED;
         task.completedAt = new Date();
 
         console.log(
-          `[Render Queue] 任务 ${task.id} 完成，耗时 ${task.renderTime}ms，已保存到 ${imageUrl}`
+          `[Render Queue] 任务 ${task.id} 完成，共 ${imageUrls.length} 张图片，耗时 ${task.renderTime}ms`
         );
+
+        // 发送完成事件到前端（用于一键生成功能的进度更新）
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('render-complete', {
+            detail: {
+              conversationId: task.data.conversationId,
+              template: task.type,
+              imageUrl: imageUrls[0],
+            }
+          }));
+        }
       } finally {
         // 释放实例
         manager.release(instance);
